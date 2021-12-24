@@ -5,6 +5,7 @@ import { Arg, Ctx, Mutation, Resolver } from 'type-graphql';
 import { User } from '../entities/User.entity';
 import { MyContext } from '../types/GqlContext.type';
 import { BadArgumentError } from '../graphql/errors/BadArgumentError.error';
+import { DuplicateEntryError } from '../graphql/errors/DuplicateEntryError.error';
 import { UsernamePasswordInput } from '../graphql/inputs/user/UsernamePasswordInput.input';
 
 @Resolver()
@@ -15,10 +16,19 @@ export class UserResolver {
    * @returns User, returns the newly created User object
    */
   @Mutation(() => User)
-  async register(@Arg('data') data: UsernamePasswordInput, @Ctx() { em }: MyContext): Promise<User> {
-    const hashedPassword = await argon2.hash(data.password);
-    const user = em.create(User, { id: uuidv4(), username: data.username, password: hashedPassword });
-    await em.persistAndFlush(user);
+  async register(@Arg('data') data: UsernamePasswordInput, @Ctx() { em }: MyContext): Promise<User | undefined> {
+    let user;
+    try {
+      const hashedPassword = await argon2.hash(data.password);
+      user = em.create(User, { id: uuidv4(), username: data.username, password: hashedPassword });
+      await em.persistAndFlush(user);
+
+      return user;
+    } catch (error) {
+      if (error.code === '23505') {
+        throw new DuplicateEntryError('Username is already taken!');
+      }
+    }
 
     return user;
   }

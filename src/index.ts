@@ -44,11 +44,13 @@ const main = async () => {
           message = obj[i];
         }
 
-        return { message };
+        return { message, path: error.path, extensions: error.extensions };
       }
 
+      // Log unhandled errors
       logger.error(error);
       console.log(util.inspect(error, { showHidden: false, depth: null, colors: true }));
+
       return new GraphQLError("Seems like something messed up, we're on it!");
     },
   });
