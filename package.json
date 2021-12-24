@@ -18,11 +18,13 @@
     "@mikro-orm/migrations": "^4.5.9",
     "@mikro-orm/postgresql": "^4.5.9",
     "apollo-server-express": "^3.5.0",
+    "class-validator": "^0.13.2",
     "cross-env": "^7.0.3",
     "dotenv": "^10.0.0",
     "express": "^4.17.2",
-    "graphql": "^16.2.0",
+    "graphql": "15",
     "pg": "^8.7.1",
+    "reflect-metadata": "^0.1.13",
     "type-graphql": "^1.1.1"
   },
   "devDependencies": {
