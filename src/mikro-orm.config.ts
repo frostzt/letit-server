@@ -10,11 +10,11 @@ const config = {
     pattern: /^[\w-]+\d+\.[jt]s$/,
   },
   entities: [Post],
-  dbName: 'letit',
-  type: 'postgresql',
   debug: !__prod__,
-  password: 'postgres',
-  user: 'postgres',
+  type: process.env.type,
+  user: process.env.user,
+  dbName: process.env.dbName,
+  password: process.env.password,
 } as Parameters<typeof MikroORM.init>[0];
 
 export default config;
