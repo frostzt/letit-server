@@ -35,5 +35,3 @@ const main = async () => {
 };
 
 main();
-
-// 57:30
