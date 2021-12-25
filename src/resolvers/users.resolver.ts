@@ -1,12 +1,21 @@
 import argon2 from 'argon2';
 import { v4 as uuidv4 } from 'uuid';
-import { Arg, Ctx, Mutation, Query, Resolver } from 'type-graphql';
+import { Arg, Ctx, Field, Mutation, ObjectType, Query, Resolver } from 'type-graphql';
 
 import { User } from '../entities/User.entity';
 import { MyContext } from '../types/GqlContext.type';
-import { BadArgumentError } from '../graphql/errors/BadArgumentError.error';
-import { DuplicateEntryError } from '../graphql/errors/DuplicateEntryError.error';
+import { PropertyError } from '../graphql/errors/FieldError.error';
+import { validLength } from '../utils/vaildators/propertyValidation.validator';
 import { UsernamePasswordInput } from '../graphql/inputs/user/UsernamePasswordInput.input';
+
+@ObjectType()
+class UserResponse {
+  @Field(() => User, { nullable: true })
+  user?: User;
+
+  @Field(() => [PropertyError], { nullable: true })
+  errors?: PropertyError[];
+}
 
 @Resolver()
 export class UserResolver {
@@ -29,8 +38,17 @@ export class UserResolver {
    * @param data, object containing username and password of the user
    * @returns User, returns the newly created User object
    */
-  @Mutation(() => User)
-  async register(@Arg('data') data: UsernamePasswordInput, @Ctx() { em, req }: MyContext): Promise<User | undefined> {
+  @Mutation(() => UserResponse)
+  async register(@Arg('data') data: UsernamePasswordInput, @Ctx() { em, req }: MyContext): Promise<UserResponse> {
+    // Validations
+    if (!validLength({ str: data.username, min: 3 })) {
+      return { errors: [{ message: 'Username must be longer than 3 characters', property: 'username' }] };
+    }
+
+    if (!validLength({ str: data.password, min: 8, max: 32 })) {
+      return { errors: [{ message: 'Password must be between 8 and 32 characters', property: 'password' }] };
+    }
+
     let user;
     try {
       const hashedPassword = await argon2.hash(data.password);
@@ -39,14 +57,16 @@ export class UserResolver {
 
       // Log the user in
       req.session.userId = user.id;
-      return user;
+      return { user };
     } catch (error) {
       if (error.code === '23505') {
-        throw new DuplicateEntryError('Username is already taken!');
+        return {
+          errors: [{ message: 'Username is taken!', property: 'username' }],
+        };
       }
     }
 
-    return user;
+    return { user };
   }
 
   /**
@@ -54,20 +74,24 @@ export class UserResolver {
    * @param data, object containing username and password of the user
    * @returns User, if verified then returns the user or else an error array
    */
-  @Mutation(() => User)
-  async login(@Arg('data') data: UsernamePasswordInput, @Ctx() { em, req }: MyContext): Promise<User> {
+  @Mutation(() => UserResponse)
+  async login(@Arg('data') data: UsernamePasswordInput, @Ctx() { em, req }: MyContext): Promise<UserResponse> {
     const user = await em.findOne(User, { username: data.username });
     if (!user) {
-      throw new BadArgumentError('Invalid credentials');
+      return {
+        errors: [{ message: 'Invalid credentials' }],
+      };
     }
 
     const isValid = await argon2.verify(user.password, data.password);
     if (!isValid) {
-      throw new BadArgumentError('Invalid credentials');
+      return {
+        errors: [{ message: 'Invalid credentials' }],
+      };
     }
 
     // Log the user in
     req.session.userId = user.id;
-    return user;
+    return { user };
   }
 }

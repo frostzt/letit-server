@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: `${process.cwd()}/.env.local` });
 
+import cors from 'cors';
 import util from 'util';
 import 'reflect-metadata';
 import express from 'express';
@@ -8,9 +9,9 @@ import * as redis from 'redis';
 import session from 'express-session';
 import { GraphQLError } from 'graphql';
 import connectRedis from 'connect-redis';
+import { buildSchema } from 'type-graphql';
 import { MikroORM } from '@mikro-orm/core';
 import { ApolloServer, ApolloError } from 'apollo-server-express';
-import { ArgumentValidationError, buildSchema } from 'type-graphql';
 import { ApolloServerPluginLandingPageGraphQLPlayground } from 'apollo-server-core';
 
 import logger from './utils/logger';
@@ -34,6 +35,7 @@ const main = async () => {
   });
   await redisClient.connect();
 
+  app.use(cors({ credentials: true, origin: 'http://localhost:3000' }));
   app.use(
     session({
       name: 'qid',
@@ -53,7 +55,7 @@ const main = async () => {
   const apolloServer = new ApolloServer({
     schema: await buildSchema({
       resolvers: [PostResolver, UserResolver],
-      validate: true,
+      validate: false,
     }),
     context: ({ req, res }): MyContext => ({ em: orm.em, req, res }),
     plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
@@ -61,17 +63,6 @@ const main = async () => {
       // Handles ApolloErrors that are NOT resolver errors
       if (error.originalError instanceof ApolloError) {
         return error;
-      }
-
-      // Only thrown by 'class-validator' incase the class validation fails
-      if (error.originalError instanceof ArgumentValidationError) {
-        const obj = error.originalError.validationErrors[0].constraints;
-        let message = '';
-        for (let i in obj) {
-          message = obj[i];
-        }
-
-        return { message, path: error.path, extensions: error.extensions };
       }
 
       // Log unhandled errors
@@ -83,7 +74,7 @@ const main = async () => {
   });
 
   await apolloServer.start();
-  apolloServer.applyMiddleware({ app });
+  apolloServer.applyMiddleware({ app, cors: false });
   app.listen(process.env.PORT, () => {
     logger.info(`App running on port ${process.env.PORT}`);
   });
