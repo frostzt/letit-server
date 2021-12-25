@@ -39,7 +39,7 @@ export class UserResolver {
    * @returns User, if verified then returns the user or else an error array
    */
   @Mutation(() => User)
-  async login(@Arg('data') data: UsernamePasswordInput, @Ctx() { em }: MyContext): Promise<User> {
+  async login(@Arg('data') data: UsernamePasswordInput, @Ctx() { em, req }: MyContext): Promise<User> {
     const user = await em.findOne(User, { username: data.username });
     if (!user) {
       throw new BadArgumentError('Invalid credentials');
@@ -49,6 +49,8 @@ export class UserResolver {
     if (!isValid) {
       throw new BadArgumentError('Invalid credentials');
     }
+
+    req.session.userId = user.id;
 
     return user;
   }
