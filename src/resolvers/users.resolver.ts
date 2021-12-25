@@ -1,5 +1,6 @@
 import argon2 from 'argon2';
 import { v4 as uuidv4 } from 'uuid';
+import { EntityManager } from '@mikro-orm/postgresql';
 import { Arg, Ctx, Field, Mutation, ObjectType, Query, Resolver } from 'type-graphql';
 
 import { User } from '../entities/User.entity';
@@ -52,8 +53,19 @@ export class UserResolver {
     let user;
     try {
       const hashedPassword = await argon2.hash(data.password);
-      user = em.create(User, { id: uuidv4(), username: data.username, password: hashedPassword });
-      await em.persistAndFlush(user);
+      const result = await (em as EntityManager)
+        .createQueryBuilder(User)
+        .getKnexQuery()
+        .insert({
+          id: uuidv4(),
+          username: data.username,
+          password: hashedPassword,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })
+        .returning('*');
+
+      user = result[0];
 
       // Log the user in
       req.session.userId = user.id;
