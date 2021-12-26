@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { Arg, Ctx, Field, Mutation, ObjectType, Query, Resolver } from 'type-graphql';
 
+import { COOKIE_NAME } from '../constants';
 import { User } from '../entities/User.entity';
 import { MyContext } from '../types/GqlContext.type';
 import { PropertyError } from '../graphql/errors/FieldError.error';
@@ -105,5 +106,25 @@ export class UserResolver {
     // Log the user in
     req.session.userId = user.id;
     return { user };
+  }
+
+  /**
+   * Logs the User out
+   * @param data, object containing username and password of the user
+   * @returns User, if verified then returns the user or else an error array
+   */
+  @Mutation(() => Boolean)
+  logout(@Ctx() { req, res }: MyContext): Promise<Boolean> {
+    return new Promise((resolve) =>
+      req.session.destroy((err) => {
+        res.clearCookie(COOKIE_NAME);
+        if (err) {
+          resolve(false);
+          return;
+        }
+
+        resolve(true);
+      }),
+    );
   }
 }
