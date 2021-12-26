@@ -1,10 +1,10 @@
-interface ValidateLengthProps {
+interface IValidateLength {
   str: string;
   min: number;
   max?: number;
 }
 
-export const validLength = ({ str, min, max }: ValidateLengthProps): boolean => {
+export const validLength = ({ str, min, max }: IValidateLength): boolean => {
   if (str.length < min) {
     return false;
   }
@@ -14,4 +14,19 @@ export const validLength = ({ str, min, max }: ValidateLengthProps): boolean => 
   }
 
   return true;
+};
+
+interface IValidateEmail {
+  str: string;
+}
+
+export const validEmail = ({ str }: IValidateEmail): boolean => {
+  const regex =
+    /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+
+  if (regex.test(str)) {
+    return true;
+  }
+
+  return false;
 };

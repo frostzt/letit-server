@@ -7,7 +7,7 @@ import { COOKIE_NAME } from '../constants';
 import { User } from '../entities/User.entity';
 import { MyContext } from '../types/GqlContext.type';
 import { PropertyError } from '../graphql/errors/FieldError.error';
-import { validLength } from '../utils/vaildators/propertyValidation.validator';
+import { validEmail, validLength } from '../utils/vaildators/propertyValidation.validator';
 import { UsernamePasswordInput } from '../graphql/inputs/user/UsernamePasswordInput.input';
 
 @ObjectType()
@@ -51,6 +51,10 @@ export class UserResolver {
       return { errors: [{ message: 'Password must be between 8 and 32 characters', property: 'password' }] };
     }
 
+    if (!validEmail({ str: data.email })) {
+      return { errors: [{ message: 'Email is not correct please verify your entered email!', property: 'email' }] };
+    }
+
     let user;
     try {
       const hashedPassword = await argon2.hash(data.password);
@@ -59,6 +63,7 @@ export class UserResolver {
         .getKnexQuery()
         .insert({
           id: uuidv4(),
+          email: data.email,
           username: data.username,
           password: hashedPassword,
           created_at: new Date(),
@@ -72,9 +77,11 @@ export class UserResolver {
       req.session.userId = user.id;
       return { user };
     } catch (error) {
+      const constraint = (error.constraint as string).split('_')[1];
+
       if (error.code === '23505') {
         return {
-          errors: [{ message: 'Username is taken!', property: 'username' }],
+          errors: [{ message: `${constraint} is taken!`, property: constraint }],
         };
       }
     }
@@ -88,15 +95,22 @@ export class UserResolver {
    * @returns User, if verified then returns the user or else an error array
    */
   @Mutation(() => UserResponse)
-  async login(@Arg('data') data: UsernamePasswordInput, @Ctx() { em, req }: MyContext): Promise<UserResponse> {
-    const user = await em.findOne(User, { username: data.username });
+  async login(
+    @Arg('usernameOrEmail') usernameOrEmail: string,
+    @Arg('password') password: string,
+    @Ctx() { em, req }: MyContext,
+  ): Promise<UserResponse> {
+    const user = await em.findOne(
+      User,
+      validEmail({ str: usernameOrEmail }) ? { email: usernameOrEmail } : { username: usernameOrEmail },
+    );
     if (!user) {
       return {
         errors: [{ message: 'Invalid credentials' }],
       };
     }
 
-    const isValid = await argon2.verify(user.password, data.password);
+    const isValid = await argon2.verify(user.password, password);
     if (!isValid) {
       return {
         errors: [{ message: 'Invalid credentials' }],
@@ -110,8 +124,7 @@ export class UserResolver {
 
   /**
    * Logs the User out
-   * @param data, object containing username and password of the user
-   * @returns User, if verified then returns the user or else an error array
+   * @returns Boolean, indicating if the user was logged out
    */
   @Mutation(() => Boolean)
   logout(@Ctx() { req, res }: MyContext): Promise<Boolean> {
@@ -127,4 +140,14 @@ export class UserResolver {
       }),
     );
   }
+
+  /**
+   * Generate a reset token if the user has forgot password
+   * @returns Boolean, if the token was successfully generated or not
+   */
+  // @Mutation(() => Boolean)
+  // async forgotPassword(@Arg('email') email: string, @Ctx() { req, em }: MyContext): Promise<Boolean> {
+  //   //  const user = await em.findOne(User, { email })
+  //   return true;
+  // }
 }
