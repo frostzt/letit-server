@@ -17,14 +17,28 @@ export const validLength = ({ str, min, max }: IValidateLength): boolean => {
 };
 
 interface IValidateEmail {
-  str: string;
+  email: string;
 }
 
-export const validEmail = ({ str }: IValidateEmail): boolean => {
+export const validEmail = ({ email }: IValidateEmail): boolean => {
   const regex =
     /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
 
-  if (regex.test(str)) {
+  if (regex.test(email)) {
+    return true;
+  }
+
+  return false;
+};
+
+interface IValidatePassword {
+  password: string;
+}
+
+export const validPassword = ({ password }: IValidatePassword): boolean => {
+  const regex = /((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/;
+
+  if (regex.test(password)) {
     return true;
   }
 

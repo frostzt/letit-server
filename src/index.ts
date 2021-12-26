@@ -4,8 +4,8 @@ dotenv.config({ path: `${process.cwd()}/.env.local` });
 import cors from 'cors';
 import util from 'util';
 import 'reflect-metadata';
+import Redis from 'ioredis';
 import express from 'express';
-import * as redis from 'redis';
 import session from 'express-session';
 import { GraphQLError } from 'graphql';
 import connectRedis from 'connect-redis';
@@ -30,16 +30,13 @@ const main = async () => {
   const app = express();
 
   const RedisStore = connectRedis(session);
-  const redisClient = redis.createClient({
-    legacyMode: true,
-  });
-  await redisClient.connect();
+  const redis = new Redis();
 
   app.use(cors({ credentials: true, origin: 'http://localhost:3000' }));
   app.use(
     session({
       name: COOKIE_NAME,
-      store: new RedisStore({ client: redisClient, disableTouch: true }),
+      store: new RedisStore({ client: redis, disableTouch: true }),
       secret: process.env.SESSION_SECRET!,
       resave: false,
       saveUninitialized: false,
@@ -57,7 +54,7 @@ const main = async () => {
       resolvers: [PostResolver, UserResolver],
       validate: false,
     }),
-    context: ({ req, res }): MyContext => ({ em: orm.em, req, res }),
+    context: ({ req, res }): MyContext => ({ em: orm.em, req, res, redis }),
     plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
     formatError: (error: GraphQLError) => {
       // Handles ApolloErrors that are NOT resolver errors

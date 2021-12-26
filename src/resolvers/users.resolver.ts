@@ -3,17 +3,27 @@ import { v4 as uuidv4 } from 'uuid';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { Arg, Ctx, Field, Mutation, ObjectType, Query, Resolver } from 'type-graphql';
 
-import { COOKIE_NAME } from '../constants';
 import { User } from '../entities/User.entity';
+import { sendEmail } from '../utils/sendMail';
 import { MyContext } from '../types/GqlContext.type';
 import { PropertyError } from '../graphql/errors/FieldError.error';
-import { validEmail, validLength } from '../utils/vaildators/propertyValidation.validator';
+import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from '../constants';
+import { validEmail, validLength, validPassword } from '../utils/vaildators/propertyValidation.validator';
 import { UsernamePasswordInput } from '../graphql/inputs/user/UsernamePasswordInput.input';
 
 @ObjectType()
 class UserResponse {
   @Field(() => User, { nullable: true })
   user?: User;
+
+  @Field(() => [PropertyError], { nullable: true })
+  errors?: PropertyError[];
+}
+
+@ObjectType()
+class BooleanResponse {
+  @Field(() => Boolean, { nullable: true })
+  changePassword?: boolean;
 
   @Field(() => [PropertyError], { nullable: true })
   errors?: PropertyError[];
@@ -47,11 +57,18 @@ export class UserResolver {
       return { errors: [{ message: 'Username must be longer than 3 characters', property: 'username' }] };
     }
 
-    if (!validLength({ str: data.password, min: 8, max: 32 })) {
-      return { errors: [{ message: 'Password must be between 8 and 32 characters', property: 'password' }] };
+    if (!validPassword({ password: data.password })) {
+      return {
+        errors: [
+          {
+            message: 'Password must be between 8 and 32, with uppercase, lowercase, and special characters!',
+            property: 'password',
+          },
+        ],
+      };
     }
 
-    if (!validEmail({ str: data.email })) {
+    if (!validEmail({ email: data.email })) {
       return { errors: [{ message: 'Email is not correct please verify your entered email!', property: 'email' }] };
     }
 
@@ -102,7 +119,7 @@ export class UserResolver {
   ): Promise<UserResponse> {
     const user = await em.findOne(
       User,
-      validEmail({ str: usernameOrEmail }) ? { email: usernameOrEmail } : { username: usernameOrEmail },
+      validEmail({ email: usernameOrEmail }) ? { email: usernameOrEmail } : { username: usernameOrEmail },
     );
     if (!user) {
       return {
@@ -145,9 +162,59 @@ export class UserResolver {
    * Generate a reset token if the user has forgot password
    * @returns Boolean, if the token was successfully generated or not
    */
-  // @Mutation(() => Boolean)
-  // async forgotPassword(@Arg('email') email: string, @Ctx() { req, em }: MyContext): Promise<Boolean> {
-  //   //  const user = await em.findOne(User, { email })
-  //   return true;
-  // }
+  @Mutation(() => Boolean)
+  async forgotPassword(@Arg('email') email: string, @Ctx() { em, redis }: MyContext): Promise<Boolean> {
+    const user = await em.findOne(User, { email });
+    if (!user) {
+      return true;
+    }
+
+    const token = uuidv4();
+    await redis.set(FORGET_PASSWORD_PREFIX + token, user.id, 'ex', 1000 * 60 * 10);
+
+    await sendEmail(
+      email,
+      `<a href="http://localhost:3000/change-password/${token}">Reset your password!</a>`,
+      'Reset your Letit password',
+    );
+
+    return true;
+  }
+
+  /**
+   * Change the users password based on the token provided
+   * @returns Boolean, if the token was successfully generated or not
+   */
+  @Mutation(() => BooleanResponse)
+  async changePassword(
+    @Arg('token') token: string,
+    @Arg('newPassword') newPassword: string,
+    @Ctx() { em, redis }: MyContext,
+  ): Promise<BooleanResponse> {
+    if (!validPassword({ password: newPassword })) {
+      return {
+        errors: [
+          {
+            message: 'Password must be between 8 and 32, with uppercase, lowercase, and special characters!',
+            property: 'password',
+          },
+        ],
+      };
+    }
+
+    const userId = await redis.get(FORGET_PASSWORD_PREFIX + token);
+    if (!userId) {
+      return { errors: [{ message: 'This session is not valid!', property: 'token' }] };
+    }
+
+    const user = await em.findOne(User, { id: userId });
+    if (!user) {
+      return { errors: [{ message: 'This user no longer exists!', property: 'token' }] };
+    }
+
+    user.password = await argon2.hash(newPassword);
+    await em.persistAndFlush(user);
+
+    return { changePassword: true };
+  }
 }
