@@ -8,8 +8,8 @@ import { sendEmail } from '../utils/sendMail';
 import { MyContext } from '../types/GqlContext.type';
 import { PropertyError } from '../graphql/errors/FieldError.error';
 import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from '../constants';
-import { validEmail, validLength, validPassword } from '../utils/vaildators/propertyValidation.validator';
 import { UsernamePasswordInput } from '../graphql/inputs/user/UsernamePasswordInput.input';
+import { validEmail, validLength, validPassword } from '../utils/vaildators/propertyValidation.validator';
 
 @ObjectType()
 class UserResponse {
@@ -202,7 +202,8 @@ export class UserResolver {
       };
     }
 
-    const userId = await redis.get(FORGET_PASSWORD_PREFIX + token);
+    const key = FORGET_PASSWORD_PREFIX + token;
+    const userId = await redis.get(key);
     if (!userId) {
       return { errors: [{ message: 'This session is not valid!', property: 'token' }] };
     }
@@ -214,6 +215,7 @@ export class UserResolver {
 
     user.password = await argon2.hash(newPassword);
     await em.persistAndFlush(user);
+    await redis.del(key);
 
     return { changePassword: true };
   }
