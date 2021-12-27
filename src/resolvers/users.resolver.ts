@@ -1,6 +1,5 @@
 import argon2 from 'argon2';
 import { v4 as uuidv4 } from 'uuid';
-import { EntityManager } from '@mikro-orm/postgresql';
 import { Arg, Ctx, Field, Mutation, ObjectType, Query, Resolver } from 'type-graphql';
 
 import { User } from '../entities/User.entity';
@@ -36,12 +35,12 @@ export class UserResolver {
    * @returns User, returns the User object or null
    */
   @Query(() => User, { nullable: true })
-  async me(@Ctx() { req, em }: MyContext): Promise<User | null> {
+  async me(@Ctx() { req }: MyContext): Promise<User | undefined> {
     if (!req.session.userId) {
-      return null;
+      return undefined;
     }
 
-    const user = await em.findOne(User, { id: req.session.userId });
+    const user = await User.findOne({ where: { id: req.session.userId } });
     return user;
   }
 
@@ -51,7 +50,7 @@ export class UserResolver {
    * @returns User, returns the newly created User object
    */
   @Mutation(() => UserResponse)
-  async register(@Arg('data') data: UsernamePasswordInput, @Ctx() { em, req }: MyContext): Promise<UserResponse> {
+  async register(@Arg('data') data: UsernamePasswordInput, @Ctx() { req }: MyContext): Promise<UserResponse> {
     // Validations
     if (!validLength({ str: data.username, min: 3 })) {
       return { errors: [{ message: 'Username must be longer than 3 characters', property: 'username' }] };
@@ -75,30 +74,15 @@ export class UserResolver {
     let user;
     try {
       const hashedPassword = await argon2.hash(data.password);
-      const result = await (em as EntityManager)
-        .createQueryBuilder(User)
-        .getKnexQuery()
-        .insert({
-          id: uuidv4(),
-          email: data.email,
-          username: data.username,
-          password: hashedPassword,
-          created_at: new Date(),
-          updated_at: new Date(),
-        })
-        .returning('*');
-
-      user = result[0];
+      user = await User.create({ email: data.email, username: data.username, password: hashedPassword });
 
       // Log the user in
       req.session.userId = user.id;
       return { user };
     } catch (error) {
-      const constraint = (error.constraint as string).split('_')[1];
-
       if (error.code === '23505') {
         return {
-          errors: [{ message: `${constraint} is taken!`, property: constraint }],
+          errors: [{ message: 'Username or email already taken!', property: 'username' }],
         };
       }
     }
@@ -115,12 +99,11 @@ export class UserResolver {
   async login(
     @Arg('usernameOrEmail') usernameOrEmail: string,
     @Arg('password') password: string,
-    @Ctx() { em, req }: MyContext,
+    @Ctx() { req }: MyContext,
   ): Promise<UserResponse> {
-    const user = await em.findOne(
-      User,
-      validEmail({ email: usernameOrEmail }) ? { email: usernameOrEmail } : { username: usernameOrEmail },
-    );
+    const user = await User.findOne({
+      where: validEmail({ email: usernameOrEmail }) ? { email: usernameOrEmail } : { username: usernameOrEmail },
+    });
     if (!user) {
       return {
         errors: [{ message: 'Invalid credentials' }],
@@ -163,8 +146,8 @@ export class UserResolver {
    * @returns Boolean, if the token was successfully generated or not
    */
   @Mutation(() => Boolean)
-  async forgotPassword(@Arg('email') email: string, @Ctx() { em, redis }: MyContext): Promise<Boolean> {
-    const user = await em.findOne(User, { email });
+  async forgotPassword(@Arg('email') email: string, @Ctx() { redis }: MyContext): Promise<Boolean> {
+    const user = await User.findOne({ where: { email } });
     if (!user) {
       return true;
     }
@@ -189,7 +172,7 @@ export class UserResolver {
   async changePassword(
     @Arg('token') token: string,
     @Arg('newPassword') newPassword: string,
-    @Ctx() { em, redis }: MyContext,
+    @Ctx() { redis }: MyContext,
   ): Promise<BooleanResponse> {
     if (!validPassword({ password: newPassword })) {
       return {
@@ -208,13 +191,12 @@ export class UserResolver {
       return { errors: [{ message: 'This session is not valid!', property: 'token' }] };
     }
 
-    const user = await em.findOne(User, { id: userId });
+    const user = await User.findOne({ where: { id: userId } });
     if (!user) {
       return { errors: [{ message: 'This user no longer exists!', property: 'token' }] };
     }
 
-    user.password = await argon2.hash(newPassword);
-    await em.persistAndFlush(user);
+    await User.update({ id: userId }, { password: await argon2.hash(newPassword) });
     await redis.del(key);
 
     return { changePassword: true };

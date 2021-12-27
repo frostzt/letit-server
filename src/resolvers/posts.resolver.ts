@@ -1,8 +1,6 @@
-import { v4 as uuidv4 } from 'uuid';
-import { Arg, Ctx, Int, Mutation, Query, Resolver } from 'type-graphql';
+import { Arg, Int, Mutation, Query, Resolver } from 'type-graphql';
 
 import { Post } from '../entities/Post.entity';
-import { MyContext } from '../types/GqlContext.type';
 
 @Resolver()
 export class PostResolver {
@@ -11,8 +9,8 @@ export class PostResolver {
    * @returns Post[], containing all the posts
    */
   @Query(() => [Post])
-  posts(@Ctx() { em }: MyContext): Promise<Post[]> {
-    return em.find(Post, {});
+  posts(): Promise<Post[]> {
+    return Post.find();
   }
 
   /**
@@ -21,8 +19,8 @@ export class PostResolver {
    * @returns Post, the post with the id or null
    */
   @Query(() => Post, { nullable: true })
-  post(@Ctx() { em }: MyContext, @Arg('id', () => Int) id: string): Promise<Post | null> {
-    return em.findOne(Post, { id });
+  post(@Arg('id', () => Int) id: string): Promise<Post | undefined> {
+    return Post.findOne(id);
   }
 
   /**
@@ -31,11 +29,8 @@ export class PostResolver {
    * @returns Post, returns the newly created post
    */
   @Mutation(() => Post)
-  async createPost(@Ctx() { em }: MyContext, @Arg('title') title: string): Promise<Post> {
-    const post = em.create(Post, { id: uuidv4(), title });
-    await em.persistAndFlush(post);
-
-    return post;
+  async createPost(@Arg('title') title: string): Promise<Post> {
+    return Post.create({ title }).save();
   }
 
   /**
@@ -45,15 +40,14 @@ export class PostResolver {
    * @returns Post, updated post is returned if the post does not exist then null
    */
   @Mutation(() => Post, { nullable: true })
-  async updatePost(@Ctx() { em }: MyContext, @Arg('title') title: string, @Arg('id') id: string): Promise<Post | null> {
-    const post = await em.findOne(Post, { id });
+  async updatePost(@Arg('title') title: string, @Arg('id') id: string): Promise<Post | null> {
+    const post = await Post.findOne(id);
     if (!post) {
       return null;
     }
 
     if (typeof title !== undefined) {
-      post.title = title;
-      await em.persistAndFlush(post);
+      await Post.update({ id }, { title });
     }
 
     return post;
@@ -65,12 +59,8 @@ export class PostResolver {
    * @returns bool, weather the post was deleted or not
    */
   @Mutation(() => Boolean)
-  async deletePost(@Ctx() { em }: MyContext, @Arg('id') id: string): Promise<boolean> {
-    try {
-      await em.nativeDelete(Post, { id });
-      return true;
-    } catch (error) {
-      return false;
-    }
+  async deletePost(@Arg('id') id: string): Promise<boolean> {
+    await Post.delete(id);
+    return true;
   }
 }

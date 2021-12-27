@@ -10,22 +10,30 @@ import session from 'express-session';
 import { GraphQLError } from 'graphql';
 import connectRedis from 'connect-redis';
 import { buildSchema } from 'type-graphql';
-import { MikroORM } from '@mikro-orm/core';
+import { createConnection } from 'typeorm';
 import { ApolloServer, ApolloError } from 'apollo-server-express';
 import { ApolloServerPluginLandingPageGraphQLPlayground } from 'apollo-server-core';
 
 import logger from './utils/logger';
-import mikroOrmConfig from './mikro-orm.config';
 import { MyContext } from './types/GqlContext.type';
 import { COOKIE_NAME, __prod__ } from './constants';
 
 // Resolvers
 import { PostResolver } from './resolvers/posts.resolver';
 import { UserResolver } from './resolvers/users.resolver';
+import { User } from './entities/User.entity';
+import { Post } from './entities/Post.entity';
 
 const main = async () => {
-  const orm = await MikroORM.init(mikroOrmConfig);
-  await orm.getMigrator().up();
+  createConnection({
+    type: 'postgres',
+    database: process.env.DB_NAME,
+    username: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    logging: true,
+    synchronize: true,
+    entities: [User, Post],
+  });
 
   const app = express();
 
@@ -54,7 +62,7 @@ const main = async () => {
       resolvers: [PostResolver, UserResolver],
       validate: false,
     }),
-    context: ({ req, res }): MyContext => ({ em: orm.em, req, res, redis }),
+    context: ({ req, res }): MyContext => ({ req, res, redis }),
     plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
     formatError: (error: GraphQLError) => {
       // Handles ApolloErrors that are NOT resolver errors
