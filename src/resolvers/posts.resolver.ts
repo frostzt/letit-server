@@ -1,6 +1,28 @@
-import { Arg, Int, Mutation, Query, Resolver } from 'type-graphql';
+import { Arg, Ctx, Field, InputType, Int, Mutation, ObjectType, Query, Resolver, UseMiddleware } from 'type-graphql';
 
 import { Post } from '../entities/Post.entity';
+import { MyContext } from '../types/GqlContext.type';
+import { PropertyError } from '../graphql/errors/FieldError.error';
+import { requireAuthentication } from '../middlewares/requireAuthentication';
+import { validLength } from '../utils/vaildators/propertyValidation.validator';
+
+@ObjectType()
+class PostResponse {
+  @Field(() => Post, { nullable: true })
+  post?: Post;
+
+  @Field(() => [PropertyError], { nullable: true })
+  errors?: PropertyError[];
+}
+
+@InputType()
+class PostInput {
+  @Field()
+  title: string;
+
+  @Field()
+  content: string;
+}
 
 @Resolver()
 export class PostResolver {
@@ -28,9 +50,19 @@ export class PostResolver {
    * @param title, title of the post that you want to create
    * @returns Post, returns the newly created post
    */
-  @Mutation(() => Post)
-  async createPost(@Arg('title') title: string): Promise<Post> {
-    return Post.create({ title }).save();
+  @Mutation(() => PostResponse)
+  @UseMiddleware(requireAuthentication)
+  async createPost(@Arg('data') data: PostInput, @Ctx() { req }: MyContext): Promise<PostResponse> {
+    if (!validLength({ str: data.title, min: 5 })) {
+      return { errors: [{ message: 'Title should be longer than 5 characters!', property: 'title' }] };
+    }
+
+    const post = await Post.create({
+      ...data,
+      creatorId: req.session.userId,
+    }).save();
+
+    return { post };
   }
 
   /**

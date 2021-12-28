@@ -1,5 +1,15 @@
 import { Field, ObjectType } from 'type-graphql';
-import { BaseEntity, Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  BaseEntity,
+  Column,
+  CreateDateColumn,
+  Entity,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+
+import { User } from './User.entity';
 
 @ObjectType()
 @Entity()
@@ -13,10 +23,25 @@ export class Post extends BaseEntity {
   title!: string;
 
   @Field(() => String)
+  @Column()
+  content!: string;
+
+  @Field(() => String)
+  @Column({ type: 'int', default: 0 })
+  points!: number;
+
+  @Field(() => String)
   @CreateDateColumn()
   createdAt: Date;
 
   @Field(() => String)
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @ManyToOne(() => User, (user) => user.posts)
+  creator: User;
+
+  @Field(() => String)
+  @Column()
+  creatorId: string;
 }
