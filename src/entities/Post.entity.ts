@@ -38,6 +38,7 @@ export class Post extends BaseEntity {
   @UpdateDateColumn()
   updatedAt: Date;
 
+  @Field()
   @ManyToOne(() => User, (user) => user.posts)
   creator: User;
 

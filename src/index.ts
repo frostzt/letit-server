@@ -1,37 +1,36 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: `${process.cwd()}/.env.local` });
 
+import { ApolloServerPluginLandingPageGraphQLPlayground } from 'apollo-server-core';
+import { ApolloError, ApolloServer } from 'apollo-server-express';
+import connectRedis from 'connect-redis';
 import cors from 'cors';
-import util from 'util';
-import 'reflect-metadata';
-import Redis from 'ioredis';
 import express from 'express';
 import session from 'express-session';
 import { GraphQLError } from 'graphql';
-import connectRedis from 'connect-redis';
+import Redis from 'ioredis';
+import 'reflect-metadata';
 import { buildSchema } from 'type-graphql';
 import { createConnection } from 'typeorm';
-import { ApolloServer, ApolloError } from 'apollo-server-express';
-import { ApolloServerPluginLandingPageGraphQLPlayground } from 'apollo-server-core';
-
-import logger from './utils/logger';
-import { MyContext } from './types/GqlContext.type';
+import util from 'util';
 import { COOKIE_NAME, __prod__ } from './constants';
-
-// Resolvers
+import { Post } from './entities/Post.entity';
+import { User } from './entities/User.entity';
 import { PostResolver } from './resolvers/posts.resolver';
 import { UserResolver } from './resolvers/users.resolver';
-import { User } from './entities/User.entity';
-import { Post } from './entities/Post.entity';
+import { MyContext } from './types/GqlContext.type';
+import logger from './utils/logger';
+import path from 'path';
 
 const main = async () => {
-  createConnection({
+  await createConnection({
     type: 'postgres',
     database: process.env.DB_NAME,
     username: process.env.DB_USER,
     password: process.env.DB_PASS,
     logging: true,
     synchronize: true,
+    migrations: [path.join(__dirname, './migrations/*')],
     entities: [User, Post],
   });
 

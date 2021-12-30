@@ -1,6 +1,6 @@
 import argon2 from 'argon2';
 import { v4 as uuidv4 } from 'uuid';
-import { Arg, Ctx, Field, Mutation, ObjectType, Query, Resolver } from 'type-graphql';
+import { Arg, Ctx, Field, FieldResolver, Mutation, ObjectType, Query, Resolver, Root } from 'type-graphql';
 
 import { User } from '../entities/User.entity';
 import { sendEmail } from '../utils/sendMail';
@@ -28,8 +28,20 @@ class BooleanResponse {
   errors?: PropertyError[];
 }
 
-@Resolver()
+@Resolver(User)
 export class UserResolver {
+  /**
+   * Don't show users each others email
+   */
+  @FieldResolver(() => String)
+  email(@Root() user: User, @Ctx() { req }: MyContext) {
+    if (req.session.userId === user.id) {
+      return user.email;
+    }
+
+    return '';
+  }
+
   /**
    * Fetches the currently logged in user based on the sesssion
    * @returns User, returns the User object or null

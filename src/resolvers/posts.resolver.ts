@@ -1,9 +1,22 @@
-import { Arg, Ctx, Field, InputType, Int, Mutation, ObjectType, Query, Resolver, UseMiddleware } from 'type-graphql';
-
+import {
+  Arg,
+  Ctx,
+  Field,
+  FieldResolver,
+  InputType,
+  Int,
+  Mutation,
+  ObjectType,
+  Query,
+  Resolver,
+  Root,
+  UseMiddleware,
+} from 'type-graphql';
+import { getConnection } from 'typeorm';
 import { Post } from '../entities/Post.entity';
-import { MyContext } from '../types/GqlContext.type';
 import { PropertyError } from '../graphql/errors/FieldError.error';
 import { requireAuthentication } from '../middlewares/requireAuthentication';
+import { MyContext } from '../types/GqlContext.type';
 import { validLength } from '../utils/vaildators/propertyValidation.validator';
 
 @ObjectType()
@@ -24,15 +37,72 @@ class PostInput {
   content: string;
 }
 
-@Resolver()
+@ObjectType()
+class PaginatedPosts {
+  @Field(() => [Post])
+  posts: Post[];
+
+  @Field()
+  hasMore: boolean;
+}
+
+@Resolver(Post)
 export class PostResolver {
+  /**
+   * Creates a contentSnippet property everytime a Post is created
+   * contentSnippet contains the first 50 characters of a post
+   */
+  @FieldResolver(() => String)
+  contentSnippet(@Root() root: Post) {
+    return root.content.slice(0, 50);
+  }
+
   /**
    * List all the posts that are available in the database
    * @returns Post[], containing all the posts
    */
-  @Query(() => [Post])
-  posts(): Promise<Post[]> {
-    return Post.find();
+  @Query(() => PaginatedPosts)
+  async posts(
+    @Arg('limit', () => Int) limit: number,
+    @Arg('cursor', () => String, { nullable: true }) cursor: string | null,
+  ): Promise<PaginatedPosts> {
+    const maxLimit = Math.min(50, limit);
+    const maxLimitPlus = Math.min(50, limit) + 1;
+
+    const replacements: any[] = [maxLimitPlus];
+
+    if (cursor) {
+      replacements.push(new Date(parseInt(cursor)));
+    }
+
+    const posts = await getConnection().query(
+      `
+      SELECT p.*,
+      json_build_object(
+        'username', u.username, 
+        'id', u.id, 
+        'email', u.email,
+        'createdAt', u."createdAt",
+        'updatedAt', u."updatedAt"
+        ) creator
+      FROM post p
+      INNER JOIN public.user u ON u.id = p."creatorId"
+      ${cursor ? `WHERE p."createdAt" < $2` : ''}
+      ORDER BY p."createdAt" DESC
+      LIMIT $1
+    `,
+      replacements,
+    );
+
+    // const queryBuilder = getConnection()
+    //   .getRepository(Post)
+    //   .createQueryBuilder('post')
+    //   .innerJoinAndSelect('post.creator', 'user', 'user.id = post."creatorId"')
+    //   .orderBy('post."createdAt"', 'DESC')
+    //   .take(maxLimitPlus);
+    console.log(posts);
+
+    return { posts: posts.slice(0, maxLimit), hasMore: posts.length === maxLimitPlus };
   }
 
   /**
