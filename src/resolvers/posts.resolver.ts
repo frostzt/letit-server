@@ -94,14 +94,6 @@ export class PostResolver {
       replacements,
     );
 
-    // const queryBuilder = getConnection()
-    //   .getRepository(Post)
-    //   .createQueryBuilder('post')
-    //   .innerJoinAndSelect('post.creator', 'user', 'user.id = post."creatorId"')
-    //   .orderBy('post."createdAt"', 'DESC')
-    //   .take(maxLimitPlus);
-    console.log(posts);
-
     return { posts: posts.slice(0, maxLimit), hasMore: posts.length === maxLimitPlus };
   }
 
@@ -111,7 +103,7 @@ export class PostResolver {
    * @returns Post, the post with the id or null
    */
   @Query(() => Post, { nullable: true })
-  post(@Arg('id', () => Int) id: string): Promise<Post | undefined> {
+  post(@Arg('id') id: string): Promise<Post | undefined> {
     return Post.findOne(id);
   }
 
@@ -163,6 +155,37 @@ export class PostResolver {
   @Mutation(() => Boolean)
   async deletePost(@Arg('id') id: string): Promise<boolean> {
     await Post.delete(id);
+    return true;
+  }
+
+  /**
+   * Updates the post with either one upvote or one downvote
+   * @param postId PostId for the post to be updated with points
+   * @param value The count for points
+   * @returns bool, weather the post was updated
+   */
+  @Mutation(() => Boolean)
+  @UseMiddleware(requireAuthentication)
+  async vote(@Arg('postId') postId: string, @Arg('value', () => Int) value: number, @Ctx() { req }: MyContext) {
+    const isUpvote = value !== -1;
+    const point = isUpvote ? 1 : -1;
+    const userId = req.session.userId;
+
+    await getConnection().query(
+      `
+    START TRANSACTION;
+
+    INSERT INTO upvote ("userId", "postId", value)
+    values ('${userId}', '${postId}', ${value});
+
+    UPDATE post
+    SET points = points + ${point}
+    WHERE id = '${postId}';
+
+    COMMIT;
+    `,
+    );
+
     return true;
   }
 }

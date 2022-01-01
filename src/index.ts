@@ -1,26 +1,26 @@
-import dotenv from 'dotenv';
-dotenv.config({ path: `${process.cwd()}/.env.local` });
-
 import { ApolloServerPluginLandingPageGraphQLPlayground } from 'apollo-server-core';
 import { ApolloError, ApolloServer } from 'apollo-server-express';
 import connectRedis from 'connect-redis';
 import cors from 'cors';
+import dotenv from 'dotenv';
 import express from 'express';
 import session from 'express-session';
 import { GraphQLError } from 'graphql';
 import Redis from 'ioredis';
+import path from 'path';
 import 'reflect-metadata';
 import { buildSchema } from 'type-graphql';
 import { createConnection } from 'typeorm';
 import util from 'util';
 import { COOKIE_NAME, __prod__ } from './constants';
 import { Post } from './entities/Post.entity';
+import { Upvote } from './entities/Upvote.entity';
 import { User } from './entities/User.entity';
 import { PostResolver } from './resolvers/posts.resolver';
 import { UserResolver } from './resolvers/users.resolver';
 import { MyContext } from './types/GqlContext.type';
 import logger from './utils/logger';
-import path from 'path';
+dotenv.config({ path: `${process.cwd()}/.env.local` });
 
 const main = async () => {
   await createConnection({
@@ -31,7 +31,7 @@ const main = async () => {
     logging: true,
     synchronize: true,
     migrations: [path.join(__dirname, './migrations/*')],
-    entities: [User, Post],
+    entities: [User, Post, Upvote],
   });
 
   const app = express();
