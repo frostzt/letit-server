@@ -1,13 +1,13 @@
 import argon2 from 'argon2';
-import { v4 as uuidv4 } from 'uuid';
 import { Arg, Ctx, Field, FieldResolver, Mutation, ObjectType, Query, Resolver, Root } from 'type-graphql';
-
-import { User } from '../entities/User.entity';
-import { sendEmail } from '../utils/sendMail';
-import { MyContext } from '../types/GqlContext.type';
-import { PropertyError } from '../graphql/errors/FieldError.error';
+import { getConnection } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from '../constants';
+import { User } from '../entities/User.entity';
+import { PropertyError } from '../graphql/errors/FieldError.error';
 import { UsernamePasswordInput } from '../graphql/inputs/user/UsernamePasswordInput.input';
+import { MyContext } from '../types/GqlContext.type';
+import { sendEmail } from '../utils/sendMail';
 import { validEmail, validLength, validPassword } from '../utils/vaildators/propertyValidation.validator';
 
 @ObjectType()
@@ -63,35 +63,49 @@ export class UserResolver {
    */
   @Mutation(() => UserResponse)
   async register(@Arg('data') data: UsernamePasswordInput, @Ctx() { req }: MyContext): Promise<UserResponse> {
-    // Validations
-    if (!validLength({ str: data.username, min: 3 })) {
-      return { errors: [{ message: 'Username must be longer than 3 characters', property: 'username' }] };
-    }
-
-    if (!validPassword({ password: data.password })) {
-      return {
-        errors: [
-          {
-            message: 'Password must be between 8 and 32, with uppercase, lowercase, and special characters!',
-            property: 'password',
-          },
-        ],
-      };
-    }
-
-    if (!validEmail({ email: data.email })) {
-      return { errors: [{ message: 'Email is not correct please verify your entered email!', property: 'email' }] };
-    }
-
     let user;
     try {
+      // Validations
+      if (!validLength({ str: data.username, min: 3 })) {
+        return { errors: [{ message: 'Username must be longer than 3 characters', property: 'username' }] };
+      }
+
+      if (!validPassword({ password: data.password })) {
+        return {
+          errors: [
+            {
+              message: 'Password must be between 8 and 32, with uppercase, lowercase, and special characters!',
+              property: 'password',
+            },
+          ],
+        };
+      }
+
+      if (!validEmail({ email: data.email })) {
+        return { errors: [{ message: 'Email is not correct please verify your entered email!', property: 'email' }] };
+      }
+
       const hashedPassword = await argon2.hash(data.password);
-      user = await User.create({ email: data.email, username: data.username, password: hashedPassword });
+
+      // Using queryBuilder since User.create() does not return all the fields
+      const result = await getConnection()
+        .createQueryBuilder()
+        .insert()
+        .into(User)
+        .values({
+          username: data.username,
+          email: data.email,
+          password: hashedPassword,
+        })
+        .returning('*')
+        .execute();
+      user = result.raw[0];
 
       // Log the user in
       req.session.userId = user.id;
       return { user };
     } catch (error) {
+      console.log(error);
       if (error.code === '23505') {
         return {
           errors: [{ message: 'Username or email already taken!', property: 'username' }],
