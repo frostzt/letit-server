@@ -1,3 +1,4 @@
+import { Upvote } from '../entities/Upvote.entity';
 import {
   Arg,
   Ctx,
@@ -65,14 +66,21 @@ export class PostResolver {
   async posts(
     @Arg('limit', () => Int) limit: number,
     @Arg('cursor', () => String, { nullable: true }) cursor: string | null,
+    @Ctx() { req }: MyContext,
   ): Promise<PaginatedPosts> {
     const maxLimit = Math.min(50, limit);
     const maxLimitPlus = Math.min(50, limit) + 1;
 
     const replacements: any[] = [maxLimitPlus];
 
+    if (req.session.userId) {
+      replacements.push(req.session.userId);
+    }
+
+    let cursorIdx = 3;
     if (cursor) {
       replacements.push(new Date(parseInt(cursor)));
+      cursorIdx = replacements.length;
     }
 
     const posts = await getConnection().query(
@@ -84,10 +92,15 @@ export class PostResolver {
         'email', u.email,
         'createdAt', u."createdAt",
         'updatedAt', u."updatedAt"
-        ) creator
+        ) creator,
+      ${
+        req.session.userId
+          ? '(SELECT value FROM upvote WHERE "userId" = $2 AND "postId" = p.id) "voteStatus"'
+          : 'null AS "voteStatus"'
+      }
       FROM post p
       INNER JOIN public.user u ON u.id = p."creatorId"
-      ${cursor ? `WHERE p."createdAt" < $2` : ''}
+      ${cursor ? `WHERE p."createdAt" < $` + cursorIdx : ''}
       ORDER BY p."createdAt" DESC
       LIMIT $1
     `,
@@ -104,7 +117,7 @@ export class PostResolver {
    */
   @Query(() => Post, { nullable: true })
   post(@Arg('id') id: string): Promise<Post | undefined> {
-    return Post.findOne(id);
+    return Post.findOne(id, { relations: ['creator'] });
   }
 
   /**
@@ -171,20 +184,50 @@ export class PostResolver {
     const point = isUpvote ? 1 : -1;
     const userId = req.session.userId;
 
-    await getConnection().query(
-      `
-    START TRANSACTION;
+    const upvote = await Upvote.findOne({ where: { postId, userId } });
 
-    INSERT INTO upvote ("userId", "postId", value)
-    values ('${userId}', '${postId}', ${value});
+    // The user has voted before and they are trying it again
+    if (upvote && upvote.value != point) {
+      await getConnection().transaction(async (tm) => {
+        await tm.query(
+          `
+          UPDATE upvote
+          SET value = $1
+          WHERE "postId" = $2 and "userId" = $3
+        `,
+          [point, postId, userId],
+        );
 
-    UPDATE post
-    SET points = points + ${point}
-    WHERE id = '${postId}';
+        await tm.query(
+          `
+          UPDATE post
+          SET points = points + $1
+          WHERE id = $2;
+         `,
+          [2 * point, postId],
+        );
+      });
+    } else if (!upvote) {
+      // The user has never voted before
+      await getConnection().transaction(async (tm) => {
+        await tm.query(
+          `
+          INSERT INTO upvote ("userId", "postId", value)
+          values ($1, $2, $3);
+        `,
+          [userId, postId, point],
+        );
 
-    COMMIT;
-    `,
-    );
+        await tm.query(
+          `
+          UPDATE post
+          SET points = points + $1
+          WHERE id = $2;
+        `,
+          [point, postId],
+        );
+      });
+    }
 
     return true;
   }
