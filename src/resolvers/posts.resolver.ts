@@ -1,4 +1,3 @@
-import { Upvote } from '../entities/Upvote.entity';
 import {
   Arg,
   Ctx,
@@ -15,6 +14,7 @@ import {
 } from 'type-graphql';
 import { getConnection } from 'typeorm';
 import { Post } from '../entities/Post.entity';
+import { Upvote } from '../entities/Upvote.entity';
 import { PropertyError } from '../graphql/errors/FieldError.error';
 import { requireAuthentication } from '../middlewares/requireAuthentication';
 import { MyContext } from '../types/GqlContext.type';
@@ -166,8 +166,9 @@ export class PostResolver {
    * @returns bool, weather the post was deleted or not
    */
   @Mutation(() => Boolean)
-  async deletePost(@Arg('id') id: string): Promise<boolean> {
-    await Post.delete(id);
+  @UseMiddleware(requireAuthentication)
+  async deletePost(@Arg('id') id: string, @Ctx() { req }: MyContext): Promise<boolean> {
+    await Post.delete({ id, creatorId: req.session.userId });
     return true;
   }
 
