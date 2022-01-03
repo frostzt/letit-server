@@ -19,6 +19,8 @@ import { User } from './entities/User.entity';
 import { PostResolver } from './resolvers/posts.resolver';
 import { UserResolver } from './resolvers/users.resolver';
 import { MyContext } from './types/GqlContext.type';
+import { createUpvoteLoader } from './utils/loaders/createUpvoteLoader';
+import { createUserLoader } from './utils/loaders/createUserLoader';
 import logger from './utils/logger';
 dotenv.config({ path: `${process.cwd()}/.env.local` });
 
@@ -61,7 +63,13 @@ const main = async () => {
       resolvers: [PostResolver, UserResolver],
       validate: false,
     }),
-    context: ({ req, res }): MyContext => ({ req, res, redis }),
+    context: ({ req, res }): MyContext => ({
+      req,
+      res,
+      redis,
+      userLoader: createUserLoader(),
+      upvoteLoader: createUpvoteLoader(),
+    }),
     plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
     formatError: (error: GraphQLError) => {
       // Handles ApolloErrors that are NOT resolver errors

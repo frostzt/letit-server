@@ -1,3 +1,4 @@
+import { User } from '../entities/User.entity';
 import {
   Arg,
   Ctx,
@@ -59,6 +60,24 @@ export class PostResolver {
   }
 
   /**
+   * Resolves User or Creator field for every post
+   */
+  @FieldResolver(() => User)
+  creator(@Root() post: Post, @Ctx() { userLoader }: MyContext) {
+    return userLoader.load(post.creatorId);
+  }
+
+  @FieldResolver(() => Int, { nullable: true })
+  async voteStatus(@Root() post: Post, @Ctx() { upvoteLoader, req }: MyContext) {
+    if (!req.session.userId) {
+      return null;
+    }
+
+    const upvote = await upvoteLoader.load({ postId: post.id, userId: req.session.userId });
+    return upvote ? upvote.value : null;
+  }
+
+  /**
    * List all the posts that are available in the database
    * @returns Post[], containing all the posts
    */
@@ -66,41 +85,21 @@ export class PostResolver {
   async posts(
     @Arg('limit', () => Int) limit: number,
     @Arg('cursor', () => String, { nullable: true }) cursor: string | null,
-    @Ctx() { req }: MyContext,
   ): Promise<PaginatedPosts> {
     const maxLimit = Math.min(50, limit);
     const maxLimitPlus = Math.min(50, limit) + 1;
 
     const replacements: any[] = [maxLimitPlus];
 
-    if (req.session.userId) {
-      replacements.push(req.session.userId);
-    }
-
-    let cursorIdx = 3;
     if (cursor) {
       replacements.push(new Date(parseInt(cursor)));
-      cursorIdx = replacements.length;
     }
 
     const posts = await getConnection().query(
       `
-      SELECT p.*,
-      json_build_object(
-        'username', u.username, 
-        'id', u.id, 
-        'email', u.email,
-        'createdAt', u."createdAt",
-        'updatedAt', u."updatedAt"
-        ) creator,
-      ${
-        req.session.userId
-          ? '(SELECT value FROM upvote WHERE "userId" = $2 AND "postId" = p.id) "voteStatus"'
-          : 'null AS "voteStatus"'
-      }
+      SELECT p.*
       FROM post p
-      INNER JOIN public.user u ON u.id = p."creatorId"
-      ${cursor ? `WHERE p."createdAt" < $` + cursorIdx : ''}
+      ${cursor ? `WHERE p."createdAt" < $2` : ''}
       ORDER BY p."createdAt" DESC
       LIMIT $1
     `,
@@ -110,6 +109,8 @@ export class PostResolver {
     return { posts: posts.slice(0, maxLimit), hasMore: posts.length === maxLimitPlus };
   }
 
+  // 11:40:30
+
   /**
    * Returns the post by searching for it via the provided id or null
    * @param id, 'id' of the post that you want
@@ -117,7 +118,7 @@ export class PostResolver {
    */
   @Query(() => Post, { nullable: true })
   post(@Arg('id') id: string): Promise<Post | undefined> {
-    return Post.findOne(id, { relations: ['creator'] });
+    return Post.findOne(id);
   }
 
   /**
