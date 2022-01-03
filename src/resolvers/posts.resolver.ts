@@ -109,8 +109,6 @@ export class PostResolver {
     return { posts: posts.slice(0, maxLimit), hasMore: posts.length === maxLimitPlus };
   }
 
-  // 11:40:30
-
   /**
    * Returns the post by searching for it via the provided id or null
    * @param id, 'id' of the post that you want

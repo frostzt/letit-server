@@ -22,26 +22,29 @@ import { MyContext } from './types/GqlContext.type';
 import { createUpvoteLoader } from './utils/loaders/createUpvoteLoader';
 import { createUserLoader } from './utils/loaders/createUserLoader';
 import logger from './utils/logger';
-dotenv.config({ path: `${process.cwd()}/.env.local` });
+dotenv.config({ path: `${process.cwd()}/.env` });
 
 const main = async () => {
-  await createConnection({
+  const conn = await createConnection({
     type: 'postgres',
     database: process.env.DB_NAME,
     username: process.env.DB_USER,
     password: process.env.DB_PASS,
-    logging: true,
-    synchronize: true,
+    logging: !__prod__,
+    synchronize: !__prod__,
     migrations: [path.join(__dirname, './migrations/*')],
     entities: [User, Post, Upvote],
   });
+  // await conn.runMigrations();
+  // 12:21:45
 
   const app = express();
 
   const RedisStore = connectRedis(session);
-  const redis = new Redis();
+  const redis = new Redis(process.env.REDIS_URL);
 
-  app.use(cors({ credentials: true, origin: 'http://localhost:3000' }));
+  app.set('proxy', 1);
+  app.use(cors({ credentials: true, origin: process.env.ORIGIN }));
   app.use(
     session({
       name: COOKIE_NAME,
@@ -54,6 +57,7 @@ const main = async () => {
         httpOnly: true,
         secure: __prod__,
         sameSite: 'lax',
+        domain: __prod__ ? '.vercel.app' : undefined,
       },
     }),
   );
@@ -87,7 +91,7 @@ const main = async () => {
 
   await apolloServer.start();
   apolloServer.applyMiddleware({ app, cors: false });
-  app.listen(process.env.PORT, () => {
+  app.listen(parseInt(process.env.PORT), () => {
     logger.info(`App running on port ${process.env.PORT}`);
   });
 };
