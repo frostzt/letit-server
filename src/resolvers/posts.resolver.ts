@@ -146,18 +146,42 @@ export class PostResolver {
    * @param id, Id of the post that you want to update
    * @returns Post, updated post is returned if the post does not exist then null
    */
-  @Mutation(() => Post, { nullable: true })
-  async updatePost(@Arg('title') title: string, @Arg('id') id: string): Promise<Post | null> {
-    const post = await Post.findOne(id);
-    if (!post) {
-      return null;
+  @Mutation(() => PostResponse, { nullable: true })
+  @UseMiddleware(requireAuthentication)
+  async updatePost(
+    @Arg('id') id: string,
+    @Ctx() { req }: MyContext,
+    @Arg('title', { nullable: true }) title?: string,
+    @Arg('content', { nullable: true }) content?: string,
+  ): Promise<PostResponse> {
+    const existingPost = await Post.findOne(id);
+    if (!existingPost) {
+      return { errors: [{ message: 'Post not found!' }] };
     }
 
-    if (typeof title !== undefined) {
-      await Post.update({ id }, { title });
+    if (existingPost.creatorId !== req.session.userId) {
+      return { errors: [{ message: "You can't edit this post, as this does not belong to you!" }] };
     }
 
-    return post;
+    const obj: { title?: string; content?: string } = {};
+
+    if (title) {
+      obj.title = title;
+    }
+
+    if (content) {
+      obj.content = content;
+    }
+
+    const post = await getConnection()
+      .createQueryBuilder()
+      .update(Post)
+      .set(obj)
+      .where('id = :id', { id })
+      .returning('*')
+      .execute();
+
+    return { post: post.raw[0] };
   }
 
   /**
