@@ -56,7 +56,7 @@ const main = async () => {
         httpOnly: true,
         secure: __prod__,
         sameSite: 'lax',
-        domain: __prod__ ? '.herokuapp.com' : undefined,
+        domain: __prod__ ? '.vercel.app' : undefined,
       },
     }),
   );
