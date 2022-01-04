@@ -27,9 +27,7 @@ dotenv.config({ path: `${process.cwd()}/.env` });
 const main = async () => {
   const conn = await createConnection({
     type: 'postgres',
-    database: process.env.DB_NAME,
-    username: process.env.DB_USER,
-    password: process.env.DB_PASS,
+    url: process.env.DATABASE_URL,
     logging: !__prod__,
     synchronize: !__prod__,
     migrations: [path.join(__dirname, './migrations/*')],
