@@ -56,7 +56,7 @@ const main = async () => {
         httpOnly: true,
         secure: __prod__,
         sameSite: 'none',
-        domain: __prod__ ? '.herokuapp.com' : undefined,
+        domain: __prod__ ? 'https://getletit.com' : undefined,
       },
     }),
   );
