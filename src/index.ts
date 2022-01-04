@@ -55,7 +55,7 @@ const main = async () => {
         maxAge: 1000 * 60 * 60 * 24 * 7,
         httpOnly: true,
         secure: __prod__,
-        sameSite: 'lax',
+        sameSite: 'none',
         domain: __prod__ ? '.letit.vercel.app' : undefined,
       },
     }),
