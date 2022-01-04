@@ -25,7 +25,7 @@ import logger from './utils/logger';
 dotenv.config({ path: `${process.cwd()}/.env` });
 
 const main = async () => {
-  const conn = await createConnection({
+  await createConnection({
     type: 'postgres',
     database: process.env.DB_NAME,
     username: process.env.DB_USER,
@@ -35,8 +35,6 @@ const main = async () => {
     migrations: [path.join(__dirname, './migrations/*')],
     entities: [User, Post, Upvote],
   });
-  // await conn.runMigrations();
-  // 12:21:45
 
   const app = express();
 
@@ -91,7 +89,7 @@ const main = async () => {
 
   await apolloServer.start();
   apolloServer.applyMiddleware({ app, cors: false });
-  app.listen(parseInt(process.env.PORT), () => {
+  app.listen(parseInt(process.env.PORT!), () => {
     logger.info(`App running on port ${process.env.PORT}`);
   });
 };
