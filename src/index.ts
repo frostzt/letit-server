@@ -25,7 +25,7 @@ import logger from './utils/logger';
 dotenv.config({ path: `${process.cwd()}/.env` });
 
 const main = async () => {
-  await createConnection({
+  const conn = await createConnection({
     type: 'postgres',
     database: process.env.DB_NAME,
     username: process.env.DB_USER,
@@ -35,6 +35,8 @@ const main = async () => {
     migrations: [path.join(__dirname, './migrations/*')],
     entities: [User, Post, Upvote],
   });
+
+  await conn.runMigrations();
 
   const app = express();
 
@@ -55,7 +57,7 @@ const main = async () => {
         httpOnly: true,
         secure: __prod__,
         sameSite: 'lax',
-        domain: __prod__ ? '.vercel.app' : undefined,
+        domain: __prod__ ? '.herokuapp.com' : undefined,
       },
     }),
   );
