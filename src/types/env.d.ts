@@ -6,7 +6,6 @@ declare namespace NodeJS {
     SESSION_SECRET: string;
     NM_USER: string;
     NM_PASS: string;
-    REDIS_URL: string;
-    REDIS_PASSWORD: string;
+    REDIS_TLS_URL: string;
   }
 }
