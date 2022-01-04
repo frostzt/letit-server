@@ -32,6 +32,7 @@ const main = async () => {
     synchronize: !__prod__,
     migrations: [path.join(__dirname, './migrations/*')],
     entities: [User, Post, Upvote],
+    ssl: __prod__,
   });
 
   await conn.runMigrations();
