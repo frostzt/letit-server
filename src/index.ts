@@ -42,7 +42,6 @@ const main = async () => {
   const RedisStore = connectRedis(session);
   const redis = new Redis(process.env.REDIS_URL);
 
-  app.set('trust proxy', 1);
   app.use(cors({ credentials: true, origin: process.env.ORIGIN }));
   app.use(
     session({
@@ -56,7 +55,6 @@ const main = async () => {
         httpOnly: true,
         secure: __prod__,
         sameSite: 'none',
-        domain: __prod__ ? '.letit.vercel.app' : undefined,
       },
     }),
   );
