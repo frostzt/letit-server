@@ -55,7 +55,7 @@ const main = async () => {
         maxAge: 1000 * 60 * 60 * 24 * 7,
         httpOnly: true,
         secure: false,
-        sameSite: 'none',
+        sameSite: 'lax',
         domain: __prod__ ? '.getletit.com' : undefined,
       },
     }),
