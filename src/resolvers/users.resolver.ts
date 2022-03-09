@@ -1,10 +1,23 @@
 import argon2 from 'argon2';
-import { Arg, Ctx, Field, FieldResolver, Mutation, ObjectType, Query, Resolver, Root } from 'type-graphql';
+import { requireAuthentication } from '../middlewares/requireAuthentication';
+import {
+  Arg,
+  Ctx,
+  Field,
+  FieldResolver,
+  Mutation,
+  ObjectType,
+  Query,
+  Resolver,
+  Root,
+  UseMiddleware,
+} from 'type-graphql';
 import { getConnection } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from '../constants';
 import { User } from '../entities/User.entity';
 import { PropertyError } from '../graphql/errors/FieldError.error';
+import { UpdateUserInput } from '../graphql/inputs/user/UpdateUser.input';
 import { UsernamePasswordInput } from '../graphql/inputs/user/UsernamePasswordInput.input';
 import { MyContext } from '../types/GqlContext.type';
 import { sendEmail } from '../utils/sendMail';
@@ -54,6 +67,30 @@ export class UserResolver {
 
     const user = await User.findOne({ where: { id: req.session.userId } });
     return user;
+  }
+
+  /**
+   * Updates and returns the updated user
+   * @returns User, returns the newly updated User object
+   */
+  @Mutation(() => UserResponse)
+  @UseMiddleware(requireAuthentication)
+  async updateUser(@Arg('data') data: UpdateUserInput, @Ctx() { req }: MyContext): Promise<UserResponse> {
+    const user = await User.findOne({ where: { id: req.session.userId } });
+    if (!user) {
+      return {
+        errors: [{ message: 'This user does not exist!' }],
+      };
+    }
+
+    const { email: updatedEmail } = data;
+    if (updatedEmail) {
+      user.email = updatedEmail;
+    }
+
+    await user.save();
+
+    return { user };
   }
 
   /**
