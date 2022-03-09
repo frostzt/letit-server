@@ -33,7 +33,7 @@ const main = async () => {
     migrations: [path.join(__dirname, './migrations/*')],
     entities: [User, Post, Upvote],
     ssl: {
-      rejectUnauthorized: false,
+      rejectUnauthorized: !__prod__,
     },
   });
 
