@@ -85,6 +85,7 @@ export class PostResolver {
   async posts(
     @Arg('limit', () => Int) limit: number,
     @Arg('cursor', () => String, { nullable: true }) cursor: string | null,
+    @Arg('byUsername', () => String, { nullable: true }) byUsername: string | null,
   ): Promise<PaginatedPosts> {
     const maxLimit = Math.min(50, limit);
     const maxLimitPlus = Math.min(50, limit) + 1;
@@ -97,8 +98,15 @@ export class PostResolver {
 
     const posts = await getConnection().query(
       `
-      SELECT p.*
+      SELECT p.* ${byUsername ? ', u.username' : ''}
       FROM post p
+      ${
+        byUsername
+          ? `INNER JOIN public.user u
+      ON p."creatorId" = u.id
+      WHERE u.username = '${byUsername}'`
+          : ''
+      }
       ${cursor ? `WHERE p."createdAt" < $2` : ''}
       ORDER BY p."createdAt" DESC
       LIMIT $1
