@@ -1,5 +1,4 @@
 import argon2 from 'argon2';
-import { requireAuthentication } from '../middlewares/requireAuthentication';
 import {
   Arg,
   Ctx,
@@ -16,9 +15,11 @@ import { getConnection } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from '../constants';
 import { User } from '../entities/User.entity';
+import { ErrorCodes } from '../graphql/errors/errorCodes';
 import { PropertyError } from '../graphql/errors/FieldError.error';
 import { UpdateUserInput } from '../graphql/inputs/user/UpdateUser.input';
 import { UsernamePasswordInput } from '../graphql/inputs/user/UsernamePasswordInput.input';
+import { requireAuthentication } from '../middlewares/requireAuthentication';
 import { MyContext } from '../types/GqlContext.type';
 import { sendEmail } from '../utils/sendMail';
 import { validEmail, validLength, validPassword } from '../utils/vaildators/propertyValidation.validator';
@@ -67,6 +68,18 @@ export class UserResolver {
 
     const user = await User.findOne({ where: { id: req.session.userId } });
     return user;
+  }
+
+  @Query(() => UserResponse, { nullable: true })
+  async getUser(@Arg('username') username: string): Promise<UserResponse> {
+    const user = await User.findOne({ where: { username } });
+    if (!user) {
+      return {
+        errors: [{ message: `The user ${username} was not found!`, errorCode: ErrorCodes.NOT_FOUND }],
+      };
+    }
+
+    return { user };
   }
 
   /**
