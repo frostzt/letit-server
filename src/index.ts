@@ -56,7 +56,7 @@ const main = async () => {
         httpOnly: true,
         secure: false,
         sameSite: 'lax',
-        domain: __prod__ ? '.vercel.app' : undefined,
+        domain: __prod__ ? '.getletit.com' : undefined,
       },
     }),
   );
