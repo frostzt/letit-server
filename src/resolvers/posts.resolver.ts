@@ -56,7 +56,7 @@ export class PostResolver {
    */
   @FieldResolver(() => String)
   contentSnippet(@Root() root: Post) {
-    return root.content.slice(0, 50);
+    return root.content.slice(0, 150);
   }
 
   /**
