@@ -13,9 +13,11 @@ import { buildSchema } from 'type-graphql';
 import { createConnection } from 'typeorm';
 import util from 'util';
 import { COOKIE_NAME, __prod__ } from './constants';
+import { Bookmark } from './entities/Bookmark.entity';
 import { Post } from './entities/Post.entity';
 import { Upvote } from './entities/Upvote.entity';
 import { User } from './entities/User.entity';
+import { BookmarkResolver } from './resolvers/bookmark.resolver';
 import { PostResolver } from './resolvers/posts.resolver';
 import { UserResolver } from './resolvers/users.resolver';
 import { MyContext } from './types/GqlContext.type';
@@ -31,10 +33,10 @@ const main = async () => {
     logging: !__prod__,
     synchronize: !__prod__,
     migrations: [path.join(__dirname, './migrations/*')],
-    entities: [User, Post, Upvote],
-    ssl: {
-      rejectUnauthorized: false,
-    },
+    entities: [User, Post, Upvote, Bookmark],
+    // ssl: {
+    //   rejectUnauthorized: false,
+    // },
   });
 
   const app = express();
@@ -63,7 +65,7 @@ const main = async () => {
 
   const apolloServer = new ApolloServer({
     schema: await buildSchema({
-      resolvers: [PostResolver, UserResolver],
+      resolvers: [PostResolver, UserResolver, BookmarkResolver],
       validate: false,
     }),
     context: ({ req, res }): MyContext => ({

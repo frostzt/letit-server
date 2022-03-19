@@ -34,6 +34,10 @@ export class Post extends BaseEntity {
   @Field(() => Int, { nullable: true })
   voteStatus: number | null;
 
+  @Field(() => Boolean)
+  @Column({ type: 'boolean', default: false })
+  pinned: boolean;
+
   @Field(() => String)
   @CreateDateColumn()
   createdAt: Date;

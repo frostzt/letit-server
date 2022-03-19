@@ -67,6 +67,9 @@ export class PostResolver {
     return userLoader.load(post.creatorId);
   }
 
+  /**
+   * Resolves the voteStatus for each post
+   */
   @FieldResolver(() => Int, { nullable: true })
   async voteStatus(@Root() post: Post, @Ctx() { upvoteLoader, req }: MyContext) {
     if (!req.session.userId) {
