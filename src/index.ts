@@ -32,7 +32,7 @@ const main = async () => {
     type: 'postgres',
     url: process.env.DATABASE_URL,
     logging: !__prod__,
-    synchronize: true,
+    synchronize: !__prod__,
     migrations: [path.join(__dirname, './migrations/*')],
     entities: [User, Post, Upvote, Bookmark],
     ssl: {
