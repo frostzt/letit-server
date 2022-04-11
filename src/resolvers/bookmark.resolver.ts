@@ -8,10 +8,10 @@ import { MyContext } from '../types/GqlContext.type';
 
 @ObjectType()
 class BookmarkWithError {
-  @Field(() => Bookmark, { nullable: true })
-  bookmark?: Bookmark;
+  @Field(() => Boolean, { nullable: true })
+  operation?: boolean;
 
-  @Field(() => PropertyError, { nullable: true })
+  @Field(() => [PropertyError], { nullable: true })
   errors?: PropertyError[];
 }
 
@@ -73,8 +73,14 @@ export class BookmarkResolver {
       };
     }
 
-    const bookmark = await Bookmark.create({ postId, userId: req.session.userId }).save();
-    return { bookmark };
+    const bookmarkExists = await Bookmark.findOne({ where: { postId, userId: req.session.userId } });
+    if (bookmarkExists) {
+      await Bookmark.delete({ postId, userId: req.session.userId });
+    } else {
+      await Bookmark.create({ postId, userId: req.session.userId }).save();
+    }
+
+    return { operation: true };
   }
 
   /**

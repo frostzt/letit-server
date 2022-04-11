@@ -20,6 +20,7 @@ import { PropertyError } from '../graphql/errors/FieldError.error';
 import { requireAuthentication } from '../middlewares/requireAuthentication';
 import { MyContext } from '../types/GqlContext.type';
 import { validLength } from '../utils/vaildators/propertyValidation.validator';
+import { Bookmark } from '../entities/Bookmark.entity';
 
 @ObjectType()
 class PostResponse {
@@ -41,6 +42,15 @@ class PostInput {
 
 @ObjectType()
 class PaginatedPosts {
+  @Field(() => [Post])
+  posts: Post[];
+
+  @Field()
+  hasMore: boolean;
+}
+
+@ObjectType()
+class PaginatedPinnedPosts {
   @Field(() => [Post])
   posts: Post[];
 
@@ -80,6 +90,20 @@ export class PostResolver {
     return upvote ? upvote.value : null;
   }
 
+  // @TODO - The bookmarks are getting loaded against DB ony by one, use DataLoader
+  /**
+   * Resolves the voteStatus for each post
+   */
+  @FieldResolver(() => Boolean, { nullable: true })
+  async bookmarked(@Root() post: Post, @Ctx() { req }: MyContext) {
+    if (!req.session.userId) {
+      return null;
+    }
+
+    const bookmarkedStatus = await Bookmark.findOne({ postId: post.id, userId: req.session.userId });
+    return !!bookmarkedStatus;
+  }
+
   /**
    * List all the posts that are available in the database
    * @returns Post[], containing all the posts
@@ -111,6 +135,39 @@ export class PostResolver {
           : ''
       }
       ${cursor ? `WHERE p."createdAt" < $2` : ''}
+      ORDER BY p."createdAt" DESC
+      LIMIT $1
+    `,
+      replacements,
+    );
+
+    return { posts: posts.slice(0, maxLimit), hasMore: posts.length === maxLimitPlus };
+  }
+
+  /**
+   * List all the posts that are supposed to be pinned
+   * @returns Post[], containing all the posts
+   */
+  @Query(() => PaginatedPinnedPosts)
+  async getPinnedPosts(
+    @Arg('limit', () => Int) limit: number,
+    @Arg('cursor', () => String, { nullable: true }) cursor: string | null,
+  ): Promise<PaginatedPinnedPosts> {
+    const maxLimit = Math.min(50, limit);
+    const maxLimitPlus = Math.min(50, limit) + 1;
+
+    const replacements: any[] = [maxLimitPlus];
+
+    if (cursor) {
+      replacements.push(new Date(parseInt(cursor)));
+    }
+
+    const posts = await getConnection().query(
+      `
+      SELECT p.*
+      FROM post p
+      ${cursor ? `WHERE p."createdAt" < $2` : ''}
+      WHERE p.pinned = true
       ORDER BY p."createdAt" DESC
       LIMIT $1
     `,

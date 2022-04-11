@@ -21,6 +21,7 @@ import { BookmarkResolver } from './resolvers/bookmark.resolver';
 import { PostResolver } from './resolvers/posts.resolver';
 import { UserResolver } from './resolvers/users.resolver';
 import { MyContext } from './types/GqlContext.type';
+import { createBookmarkLoader } from './utils/loaders/createBookmarkLoader';
 import { createUpvoteLoader } from './utils/loaders/createUpvoteLoader';
 import { createUserLoader } from './utils/loaders/createUserLoader';
 import logger from './utils/logger';
@@ -34,9 +35,9 @@ const main = async () => {
     synchronize: !__prod__,
     migrations: [path.join(__dirname, './migrations/*')],
     entities: [User, Post, Upvote, Bookmark],
-    // ssl: {
-    //   rejectUnauthorized: false,
-    // },
+    ssl: {
+      rejectUnauthorized: false,
+    },
   });
 
   const app = express();
@@ -72,6 +73,7 @@ const main = async () => {
       req,
       res,
       redis,
+      bookmarkLoader: createBookmarkLoader(),
       userLoader: createUserLoader(),
       upvoteLoader: createUpvoteLoader(),
     }),
